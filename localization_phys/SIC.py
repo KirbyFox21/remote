@@ -1,3 +1,9 @@
+
+import sys
+# 获取Python版本号
+version = sys.version
+print("Python version:", version)
+
 import tensorcircuit as tc
 import numpy as np
 import matplotlib.pyplot as plt
