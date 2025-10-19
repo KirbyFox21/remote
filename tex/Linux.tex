@@ -1,0 +1,149 @@
+\documentclass{article}
+% \usepackage[UTF8]{ctex}
+\usepackage{ctex}
+\usepackage{amsmath,amssymb}
+\usepackage{authblk}
+\usepackage{xcolor} 
+\usepackage{listings}
+\lstset{
+    basicstyle=\tt\small,
+    columns=flexible,
+    breaklines=true,
+	tabsize=4,
+    xleftmargin=2em, %整体距左侧边线的距离为2em
+	numbers=left,
+    numberstyle=\tt\tiny,
+    frame=single,
+	backgroundcolor=\color[RGB]{225,225,225}  %代码背景色
+}
+
+\begin{document}
+
+\begin{lstlisting}
+nohup command
+\end{lstlisting}
+
+执行命令，命令不挂起，退出终端后仍然继续执行；
+\begin{lstlisting}
+command &
+\end{lstlisting}
+后台执行，允许输入等操作，退出终端后就终止，所以一般用：
+\begin{lstlisting}
+nohup command &
+\end{lstlisting}
+\begin{lstlisting}
+nohup command
+\end{lstlisting}
+默认输出到nohup.out文件。
+> 是输出重定向符号， < 是输入重定向符号。
+\begin{lstlisting}
+nohup command >filename
+\end{lstlisting}
+实现输出到特定文件。
+0表示标准输入，1表示标准输出，2表示标准错误输出。
+2>\&1 意为将标准错误重定向为标准输出，相当于合并正常输出和报错。
+\&表示将1识别为标准输出的含义，而不是文件1。
+/dev/null 是预留的空文件，向其中的所有输出都会消失。
+\begin{lstlisting}
+command >/dev/null 2>&1
+\end{lstlisting}
+的作用就是将标准输出屏蔽，标准错误重定向到标准输出（即也屏蔽标准错误）。
+\begin{lstlisting}
+command </dev/null
+\end{lstlisting}
+的作用是如果命令需要一个输入，则输入空值，这样可以避免出现多余的输入框。
+
+这样就清楚以下语句的含义了：
+\begin{lstlisting}
+nohup matlab -nodisplay -r xxx >outfile.txt </dev/null 2>&1 &
+\end{lstlisting}
+
+
+conda 配置不同版本的python环境
+
+查询环境列表
+\begin{lstlisting}
+conda env list
+\end{lstlisting}
+其中base为默认环境，一般是最新的python，不要改动。
+
+配置新环境，例：
+\begin{lstlisting}
+conda create -n py37 python=3.7
+\end{lstlisting}
+配置好后
+\begin{lstlisting}
+conda init
+\end{lstlisting}
+之后重启终端。
+激活环境用
+\begin{lstlisting}
+conda activate py37
+\end{lstlisting}
+切换回默认环境（base）用
+\begin{lstlisting}
+conda deactivate
+\end{lstlisting}
+新环境是空的，需要安装各类包。
+
+在对应环境中启动jupyter notebook，但是使用的包还是base里的，解决方法是在启用的虚拟环境中安装
+\begin{lstlisting}
+conda install nb_conda
+\end{lstlisting}
+再在对应环境中启动jupyter notebook。
+对于新版本python，nb\_conda不再支持，要自行创建jupyter notebook的内核。
+激活相应环境，例：
+\begin{lstlisting}
+conda activate py312
+\end{lstlisting}
+后面都是在这一环境中进行。
+安装需要的组件
+\begin{lstlisting}
+conda install ipykernel
+\end{lstlisting}
+注册内核
+\begin{lstlisting}
+python -m ipykernel install --user --name py312 --display-name "python 3.12"
+% --user 表示只对该用户安装，“py312”替换为对应的环境名
+\end{lstlisting}
+再启动jupyter notebook就可以选择需要的内核了。
+
+删除不需要的环境：
+\begin{lstlisting}
+conda remove --name old_env --all
+% old_env 是待删除的环境的名称
+\end{lstlisting}
+这也会删除这个环境下安装的所有库。
+
+已安装CUDA和cuDNN，目录都在，但是加载不了，有可能是环境变量没有设置好。
+在对应用户终端输入
+\begin{lstlisting}
+echo $CUDA_HOME
+echo $LD_LIBRARY_PATH
+\end{lstlisting}
+如果没有返回就说明没设置。
+下面开始设置，在需要的用户的终端输入
+\begin{lstlisting}
+vim ~/.bashrc
+\end{lstlisting}
+按i键开始编辑，在最后添加
+\begin{lstlisting}
+export CUDA_HOME=/usr/local/cuda-x.x
+export PATH=$CUDA_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/usr/local/cuda-x.x/lib64:$LD_LIBRARY_PATH
+% （这里最后两行是不是重复了？）
+% cuda-x.x是cuda安装的文件夹，例：cuda-12.8。
+\end{lstlisting}
+编辑好后按esc，键盘输入:wq回车，退出编辑器。在终端输入
+\begin{lstlisting}
+source ~/.bashrc
+\end{lstlisting}
+应用编辑，再检查
+\begin{lstlisting}
+echo $CUDA_HOME
+echo $LD_LIBRARY_PATH
+\end{lstlisting}
+有值就行。
+
+\end{document}
