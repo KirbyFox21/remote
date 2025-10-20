@@ -12,8 +12,8 @@ import time
 K = tc.set_backend("numpy")
 tc.set_dtype("complex128")
 
-def gen_H_entangle_nambu(L):
-    H = np.zeros((2*L+2, 2*L+2), dtype=np.complex128)
+def gen_H_entangle_nambu(L):  # 这个哈密顿量用于建立参考比特与第 L//2 个 site 的纠缠
+    H = np.zeros((2*L+2, 2*L+2), dtype=np.complex128)  # 第 L+1 个 site 是参考比特，python 里的编号是 L
 
     H[L//2, L] = 1 / 2
     H[L, L//2] = 1 / 2
@@ -22,7 +22,7 @@ def gen_H_entangle_nambu(L):
 
     return H
 
-def gen_H_GAA_nambu(L, t, lbd, a, b, phi):
+def gen_H_GAA_nambu(L, t, lbd, a, b, phi):  # 用 Nambu 哈密顿量是因为 tensorcircuit 的 fgs 使用了 Bogoliubov 变换。代入 c 和 Bogoliubov 变换的 alpha 的关系就能得到哈密顿量
     H = np.zeros((2*L+2, 2*L+2), dtype=np.complex128)
 
     for i in range(L-1):
@@ -37,69 +37,27 @@ def gen_H_GAA_nambu(L, t, lbd, a, b, phi):
 
     return H
 
-def gen_psi_0(state_name, L, f):
-    if state_name == "random_state":
-        filled_indices = np.random.choice(np.arange(L), size=L//f, replace=False)
-        if np.in1d(L//2, filled_indices) == False:
-            filled_indices = np.append(filled_indices, [L])
-        alpha = tc.FGSSimulator.init_alpha(filled_indices, L+1)
-    elif state_name == "neel_state":
-        filled_indices = np.arange(0, L, f)
-        if np.in1d(L//2, filled_indices) == False:
-            filled_indices = np.append(filled_indices, [L])
-        alpha = tc.FGSSimulator.init_alpha(filled_indices, L+1)
-    elif state_name == "bipartite_state":
-        filled_indices = np.arange(L//f, L)
-        if np.in1d(L//2, filled_indices) == False:
-            filled_indices = np.append(filled_indices, [L])
-        alpha = tc.FGSSimulator.init_alpha(filled_indices, L+1)
-    else:
-        print("state name is wrong")
-        exit(1)
-
-    return alpha
-
 def cal_SIC_of_x(state_name, L, t, lbd_array, a, b, phi, pre, steps, dt, f):
     H_ent = gen_H_entangle_nambu(L)
+    filled_indices = np.arange(0 , L//f)
+    # filled_indices = np.arange(L//f, L)
+    if np.in1d(L//2, filled_indices) == False:  # 这也是用来建立纠缠的。如果第 L//2 个 site 无占据，则参考比特有占据，反之则无
+        filled_indices = np.append(filled_indices, [L])
 
-    if state_name == "random_state":
-        random_sample = 20
-        SIC_array = np.zeros((len(lbd_array), steps, L//2, random_sample))
-        alpha_0_array = [gen_psi_0(state_name, L, f) for _ in range(random_sample)]
-        for r, alpha_0 in enumerate(alpha_0_array):
-            for i, lbd in enumerate(lbd_array):
-                print(f"r = {r+1} / {random_sample}, ldb = {lbd:.2f} ({i + 1} / {len(lbd_array)})")
-                
-                H_evo = gen_H_GAA_nambu(L, t, lbd, a, b, phi)
-                system = tc.FGSSimulator(L+1, alpha=alpha_0)
-                system.evol_ghamiltonian(2 * H_ent * np.pi/4)
-                system.evol_ghamiltonian(2 * H_evo * pre)
-
-                random_array = np.random.rand(steps)
-                for j in range(steps):
-                    for x in range(L//2):
-                        E_list = np.arange(L//2-x, L//2+x+0.001, 1)
-                        S_E = system.entropy(E_list)
-                        S_R = system.entropy([L])
-                        S_ER = system.entropy(np.append(E_list, L))
-                        SIC_array[i, j, x, r] = S_E + S_R - S_ER
-                    system.evol_ghamiltonian(2 * H_evo * dt * random_array[j])
-
-    else:
-        alpha_0 = gen_psi_0(state_name, L, f)
+    if state_name == "bipartite_state":
         SIC_array = np.zeros((len(lbd_array), steps, L//2))
         for i, lbd in enumerate(lbd_array):
             print(f"ldb = {lbd:.2f} ({i + 1} / {len(lbd_array)})")
             
             H_evo = gen_H_GAA_nambu(L, t, lbd, a, b, phi)
-            system = tc.FGSSimulator(L+1, alpha=alpha_0)
+            system = tc.FGSSimulator(L+1, filled=filled_indices)
             system.evol_ghamiltonian(2 * H_ent * np.pi/4)
             system.evol_ghamiltonian(2 * H_evo * pre)
 
             random_array = np.random.rand(steps)
             for j in range(steps):
                 for x in range(L//2):
-                    E_list = np.arange(L//2-x, L//2+x+0.001, 1)
+                    E_list = np.arange(L//2-x, L//2+x+0.001, 1)  # +0.001 使得列表取值能取到后一个数，且数据类型为浮点数，虽然它本身是整数
                     S_E = system.entropy(E_list)
                     S_R = system.entropy([L])
                     S_ER = system.entropy(np.append(E_list, L))
@@ -117,13 +75,11 @@ def vis_SIC_of_x(state_name, L, lbd_array, a, pre, steps, dt, f):
     plt.figure(figsize=(10, 6))
 
     for lbd_idx, lbd in enumerate(lbd_array):
-        if state_name == "random_state":
-            SIC_LTA_array = np.mean(SIC_array, axis=1)
-            SIC_RSA_array = np.mean(SIC_LTA_array, axis=2)
-            SIC_error_array = [np.sqrt(np.sum((SIC_LTA_array[lbd_idx, i, :] - SIC_RSA_array[lbd_idx, i]) ** 2) / (np.size(SIC_LTA_array, 2) - 1)) for i in range(np.size(SIC_LTA_array, 1))]
-            plt.errorbar(range(L//2), SIC_RSA_array[lbd_idx, :] / np.log(2), SIC_error_array / np.log(2), linewidth=2, marker='.', label=rf"$\lambda={lbd:.2f}$")
-        else:
+        if state_name == "bipartite_state":
             plt.plot(range(L//2), np.mean(SIC_array[lbd_idx, :, :] / np.log(2), 0), marker='.', linewidth=2, label=rf"$\lambda={lbd:.2f}$")
+            # mean(a, axis=())  # 表示对给定轴求平均值
+            # 多维数组，给定其中一个指标，其他全是 : ，则新数组的尺寸为原数组尺寸删掉给定的那个轴
+            # 例：a 的尺寸是 (2, 3, 4)，b = a [:, 1, :]，则 b 的尺寸是 (2, 4)
 
     plt.title(state_name)
     plt.legend()
@@ -132,7 +88,6 @@ def vis_SIC_of_x(state_name, L, lbd_array, a, pre, steps, dt, f):
     plt.tight_layout()
     plt.savefig("fig//" + file_name + ".png", dpi=300, bbox_inches="tight")
     plt.show()
-
 
 if __name__ == "__main__":
     np.random.seed(123)
@@ -147,6 +102,13 @@ if __name__ == "__main__":
     pre = 10000
     steps = 10
     dt = 10
+    
+    import os
+    if not os.path.exists('data'):
+        os.mkdir('data')  # 创建文件夹
+    if not os.path.exists('fig'):
+        os.mkdir('fig')
+    del os
 
     start_time = time.time()
     cal_SIC_of_x(state_name, L, t, lbd_array, a, b, phi, pre, steps, dt, f)
